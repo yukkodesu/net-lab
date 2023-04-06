@@ -20,3 +20,5 @@ void ethernet_out(buf_t *buf, const uint8_t *mac, net_protocol_t protocol);
 void ethernet_poll();
 static const uint8_t ether_broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //以太网广播mac地址
 #endif
+
+#define MIN_ETHER_LEN 46
