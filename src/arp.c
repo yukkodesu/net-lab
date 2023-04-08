@@ -1,8 +1,14 @@
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "buf.h"
+#include "config.h"
+#include "map.h"
 #include "net.h"
 #include "arp.h"
 #include "ethernet.h"
+#include "utils.h"
 /**
  * @brief 初始的arp包
  * 
@@ -59,6 +65,14 @@ void arp_print()
 void arp_req(uint8_t *target_ip)
 {
     // TO-DO
+    buf_t *buf = malloc(sizeof(buf_t));
+    buf_init(buf, sizeof(arp_pkt_t));
+    arp_pkt_t *pkt = buf->data;
+    memcpy(pkt, &arp_init_pkt, sizeof(arp_pkt_t));
+    memcpy(pkt->target_ip, target_ip, NET_IP_LEN);
+    pkt->opcode16 = swap16(ARP_REQUEST);
+    buf_add_padding(buf, MIN_ETHER_LEN - buf->len);
+    ethernet_out(buf, ether_broadcast_mac, NET_PROTOCOL_ARP);
 }
 
 /**
@@ -70,6 +84,15 @@ void arp_req(uint8_t *target_ip)
 void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 {
     // TO-DO
+    buf_t *buf = malloc(sizeof(buf_t));
+    buf_init(buf, sizeof(arp_pkt_t));
+    arp_pkt_t *pkt = buf->data;
+    memcpy(pkt, &arp_init_pkt, sizeof(arp_init_pkt));
+    memcpy(pkt->target_ip, target_ip, NET_IP_LEN);
+    memcpy(pkt->target_mac, target_mac, NET_MAC_LEN);
+    pkt->opcode16 = swap16(ARP_REPLY);
+    buf_add_padding(buf, MIN_ETHER_LEN - buf->len);
+    ethernet_out(buf, target_mac, NET_PROTOCOL_ARP);
 }
 
 /**
@@ -81,6 +104,24 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 void arp_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
+    if (buf->len < ARP_HEAD_LENGTH) {
+      return;
+    }
+    arp_pkt_t *pkt = buf->data;
+    if (memcmp(pkt, &arp_init_pkt, 6) != 0) {
+      return;
+    }
+    uint8_t my_ip[] = NET_IF_IP;
+    if (pkt->opcode16 == swap16(ARP_REQUEST) &&
+        memcmp(pkt->target_ip, my_ip, NET_IP_LEN) == 0) {
+      arp_resp(pkt->sender_ip, src_mac);
+    }
+    map_set(&arp_table, pkt->sender_ip, src_mac);
+    buf_t *previous_buf = map_get(&arp_buf, pkt->sender_ip);
+    if (previous_buf != NULL) {
+      map_delete(&arp_buf, pkt->sender_ip);
+      ethernet_out(previous_buf, src_mac, NET_PROTOCOL_IP);
+    }
 }
 
 /**
@@ -93,6 +134,17 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
 void arp_out(buf_t *buf, uint8_t *ip)
 {
     // TO-DO
+    uint8_t *mac = map_get(&arp_table, ip);
+    if (mac != NULL) {
+      ethernet_out(buf, mac, NET_PROTOCOL_IP);
+      return;
+    }
+    buf_t *previous_buf = map_get(&arp_buf, ip);
+    if (previous_buf != NULL) {
+      return;
+    }
+    map_set(&arp_buf, ip, buf);
+    arp_req(ip);
 }
 
 /**

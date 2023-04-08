@@ -21,6 +21,9 @@ typedef struct arp_pkt
     uint8_t target_ip[NET_IP_LEN];   // 接收方协议地址
 } arp_pkt_t;
 
+#define ARP_HEAD_LENGTH 8
+
+
 #pragma pack()
 
 void arp_init();
