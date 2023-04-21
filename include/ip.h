@@ -18,6 +18,9 @@ typedef struct ip_hdr
     uint8_t src_ip[NET_IP_LEN]; // 源IP
     uint8_t dst_ip[NET_IP_LEN]; // 目标IP
 } ip_hdr_t;
+
+static int id = 0;
+
 #pragma pack()
 
 #define IP_HDR_LEN_PER_BYTE 4      //ip包头长度单位
