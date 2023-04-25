@@ -30,8 +30,9 @@ void ip_in(buf_t *buf, uint8_t *src_mac) {
   memcpy(hdr_bak, hdr, sizeof(ip_hdr_t));
   hdr->hdr_checksum16 = 0;
   uint16_t checksum = checksum16(hdr, (hdr->hdr_len) * IP_HDR_LEN_PER_BYTE);
-  if (checksum != swap16(hdr_bak->hdr_checksum16))
+  if (checksum != hdr_bak->hdr_checksum16)
     return;
+  hdr->hdr_checksum16 = checksum;
   free(hdr_bak);
   if (memcmp(hdr->dst_ip, net_if_ip, NET_IP_LEN) != 0)
     return;
@@ -39,9 +40,10 @@ void ip_in(buf_t *buf, uint8_t *src_mac) {
     buf_remove_padding(buf, buf->len - total_len);
   }
   buf_remove_header(buf, sizeof(ip_hdr_t));
-  if (hdr->protocol != 17 && hdr->protocol != 6)
+  if (net_in(buf, hdr->protocol, hdr->src_ip) == -1) {
+    icmp_unreachable(buf, hdr->src_ip, ICMP_CODE_PROTOCOL_UNREACH);
     return;
-  net_in(buf, hdr->protocol, hdr->src_ip);
+  }
 }
 
 /**
